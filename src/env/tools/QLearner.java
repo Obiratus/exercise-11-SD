@@ -68,12 +68,12 @@ public void calculateQ(Object[] goalDescription, Object episodesObj, Object alph
     Integer goalKey = Arrays.hashCode(goalDescription);
 
     // Run Q-learning algorithm for the specified number of episodes
-    for (int episode = 0; episode < episodes; episode++) {
-        randomizeState();
+    for (int episode = 1; episode <= episodes; episode++) {
+        randomizeState(goalDescription);
 
         int currentState = lab.readCurrentState();
 
-        int maxSteps = 100;
+        int maxSteps = 10000;
         for (int step = 0; step < maxSteps; step++) {
 
             List<Integer> applicableActions = lab.getApplicableActions(currentState);
@@ -88,8 +88,7 @@ public void calculateQ(Object[] goalDescription, Object episodesObj, Object alph
 
             int newState = lab.readCurrentState();
 
-            double calculatedReward = calculateReward(goalDescription);
-
+            double calculatedReward = calculateReward(goalDescription, reward);
             double maxQNext = getMaxQ(qTable, newState, lab.getApplicableActions(newState));
 
             // Update Q-value using the Q-learning formula
@@ -99,12 +98,31 @@ public void calculateQ(Object[] goalDescription, Object episodesObj, Object alph
             currentState = newState;
 
             // Check if we've reached a goal state
-            if (isGoalState(newState, goalDescription)) {
+            List<Integer> currentStateComponents = lab.currentState; // Get the actual state components
+
+            int z1Level = currentStateComponents.get(0);
+            int z2Level = currentStateComponents.get(1);
+
+            // Get goal values with proper casting
+            int goalZ1 = ((Number)goalDescription[0]).intValue();
+            int goalZ2 = ((Number)goalDescription[1]).intValue();
+
+
+            // Log what we're comparing
+            // LOGGER.info("Comparing current state [" + z1Level + "," + z2Level + "] with goal state [" + goalZ1 + "," + goalZ2 + "]");
+
+            boolean matchesGoal = (z1Level == ((Number)goalDescription[0]).intValue() &&
+                    z2Level == ((Number)goalDescription[1]).intValue());
+
+            if (matchesGoal) {
+                LOGGER.info("Goal state reached in episode " + episode + " after " + step + " steps.");
+                LOGGER.info("Goal state found at currentState " + currentState + ".");
                 break;
             }
+
         }
 
-        if (episode % 100 == 0) {
+        if (episodes <= 10 || episode % 100 == 0) {
             LOGGER.info("Completed episode " + episode + " of " + episodes);
         }
     }
@@ -117,21 +135,107 @@ public void calculateQ(Object[] goalDescription, Object episodesObj, Object alph
     LOGGER.info("Q-learning completed for goal " + Arrays.toString(goalDescription));
 }
 
+
     /**
-     * Randomizes the state of the lab environment by performing random actions
+     * Randomizes the state of the lab environment by focusing on actions
+     * that directly control the environmental factors affecting illumination
+     *
+     * @param goalDescription An Object array containing the goal state values to avoid
      */
-    private void randomizeState() {
+    private void randomizeState(Object[] goalDescription) {
+        LOGGER.info("Starting targeted illumination randomization...");
+        LOGGER.info("Goal state to avoid: [" + goalDescription[0] + "," + goalDescription[1] + "]");
         Random random = new Random();
-        for (int i = 0; i < 5; i++) {
+
+        // Get the initial state
+        int initialStateId = lab.readCurrentState();
+        List<Integer> initialComponents = new ArrayList<>(lab.currentState);
+        LOGGER.info("Initial state ID: " + initialStateId + ", components: " + initialComponents);
+
+        // Store the initial values of the first two components (illumination values)
+        int initialZ1 = initialComponents.get(0);
+        int initialZ2 = initialComponents.get(1);
+
+        // Convert goal state components to integers for comparison
+        int goalZ1 = ((Number)goalDescription[0]).intValue();
+        int goalZ2 = ((Number)goalDescription[1]).intValue();
+
+        // Check if we're already at a non-goal state
+        boolean atNonGoalState = (initialZ1 != goalZ1 || initialZ2 != goalZ2);
+        if (atNonGoalState) {
+            LOGGER.info("Already at a non-goal state. No randomization needed.");
+            return;
+        }
+
+        // Number of randomization attempts
+        int maxAttempts = 10000;
+
+        // Perform multiple random actions to try to change the illumination state
+        for (int i = 0; i < maxAttempts; i++) {
             int currentState = lab.readCurrentState();
             List<Integer> applicableActions = lab.getApplicableActions(currentState);
+            // LOGGER.info("Attempt " + (i+1) + ": Current state: " + currentState + ", components: " + lab.currentState);
+
             if (!applicableActions.isEmpty()) {
                 int randomActionIndex = random.nextInt(applicableActions.size());
                 int randomAction = applicableActions.get(randomActionIndex);
+                // LOGGER.info("Performing random action: " + randomAction);
+
                 lab.performAction(randomAction);
+
+                // Log current illumination values
+                lab.readCurrentState();
+                List<Integer> currentComponents = new ArrayList<>(lab.currentState);
+                // LOGGER.info("Initial state ID: " + initialStateId + ", components: " + initialComponents);
+
+                // Store the initial values of the first two components (illumination values)
+                int currentZ1 = currentComponents.get(0);
+                int currentZ2 = currentComponents.get(1);
+
+                // LOGGER.info("After action: Illumination values: [" + currentZ1 + "," + currentZ2 + "]");
+
+                // Check if we've reached a non-goal state
+                if (currentZ1 != goalZ1 || currentZ2 != goalZ2) {
+                    LOGGER.info("Successfully reached a non-goal state: [" + currentZ1 + "," +
+                            currentZ2 + "] (different from goal [" + goalZ1 + "," + goalZ2 + "])");
+                    return; // Exit early once we've reached a non-goal state
+                }
+            } else {
+                LOGGER.warning("No applicable actions available for state " + currentState);
             }
         }
+
+        // Log final state after randomization
+        int finalStateId = lab.readCurrentState();
+        List<Integer> finalComponents = new ArrayList<>(lab.currentState);
+        LOGGER.info("Randomization complete.");
+        LOGGER.info("Initial illumination: [" + initialZ1 + "," + initialZ2 + "] → " +
+                "Final illumination: [" + finalComponents.get(0) + "," + finalComponents.get(1) + "]");
+
+        // Check if we're still at the goal state
+        if (finalComponents.get(0) == goalZ1 && finalComponents.get(1) == goalZ2) {
+            LOGGER.warning("WARNING: After " + maxAttempts + " attempts, could not move away from the goal state! " +
+                    "This may indicate a problem with the environment dynamics or the goal state is too stable.");
+
+            // Last resort: try a more aggressive approach - perform many more random actions
+            LOGGER.info("Attempting aggressive randomization as a last resort...");
+            for (int i = 0; i < 30; i++) {
+                List<Integer> moreActions = lab.getApplicableActions(lab.readCurrentState());
+                if (!moreActions.isEmpty()) {
+                    int action = moreActions.get(random.nextInt(moreActions.size()));
+                    lab.performAction(action);
+
+                    if (lab.currentState.get(0) != goalZ1 || lab.currentState.get(1) != goalZ2) {
+                        LOGGER.info("Aggressive randomization succeeded! New state: " + lab.currentState);
+                        return;
+                    }
+                }
+            }
+
+            LOGGER.severe("CRITICAL: Could not move away from goal state even with aggressive randomization!");
+        }
     }
+
 
     /**
      * Chooses an action using epsilon-greedy policy
@@ -198,9 +302,10 @@ public void calculateQ(Object[] goalDescription, Object episodesObj, Object alph
     /**
      * Calculates the reward for transitioning to a new state
      * @param goalDescription The goal description
+     * @param goalReward The reward value to use when goal state is reached
      * @return The calculated reward
      */
-    private double calculateReward(Object[] goalDescription) {
+    private double calculateReward(Object[] goalDescription, Integer goalReward) {
         // Extract the desired light levels from the goal description
         int goalZ1Level = Integer.parseInt(goalDescription[0].toString());
         int goalZ2Level = Integer.parseInt(goalDescription[1].toString());
@@ -231,7 +336,8 @@ public void calculateQ(Object[] goalDescription, Object episodesObj, Object alph
 
         // Add large reward if goal state is reached
         if (atGoalState) {
-            reward += 100.0;
+            reward += goalReward;
+
         }
 
         // Apply energy consumption penalty for lights (50 units each)
