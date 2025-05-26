@@ -7,7 +7,8 @@ import cartago.OPERATION;
 import cartago.OpFeedbackParam;
 
 public class QLearner extends Artifact {
-
+    private int prevZ1Level = 0; // Default to 0 or another appropriate initial value
+    private int prevZ2Level = 0; // Default to 0 or another appropriate initial value
   private Lab lab; // the lab environment that will be learnt 
   private int stateCount; // the number of possible states in the lab environment
   private int actionCount; // the number of possible actions in the lab environment
@@ -52,17 +53,251 @@ public class QLearner extends Artifact {
 * @param epsilonObj the exploration probability [0,1]
 * @param rewardObj the reward assigned when reaching the goal state
 **/
-  @OPERATION
-  public void calculateQ(Object[] goalDescription , Object episodesObj, Object alphaObj, Object gammaObj, Object epsilonObj, Object rewardObj) {
-    
+@OPERATION
+public void calculateQ(Object[] goalDescription, Object episodesObj, Object alphaObj, Object gammaObj, Object epsilonObj, Object rewardObj) {
+
     // ensure that the right datatypes are used
     Integer episodes = Integer.valueOf(episodesObj.toString());
     Double alpha = Double.valueOf(alphaObj.toString());
     Double gamma = Double.valueOf(gammaObj.toString());
     Double epsilon = Double.valueOf(epsilonObj.toString());
     Integer reward = Integer.valueOf(rewardObj.toString());
-  
-  }
+
+    double[][] qTable = initializeQTable();
+
+    Integer goalKey = Arrays.hashCode(goalDescription);
+
+    // Run Q-learning algorithm for the specified number of episodes
+    for (int episode = 0; episode < episodes; episode++) {
+        randomizeState();
+
+        int currentState = lab.readCurrentState();
+
+        int maxSteps = 100;
+        for (int step = 0; step < maxSteps; step++) {
+
+            List<Integer> applicableActions = lab.getApplicableActions(currentState);
+
+            if (applicableActions.isEmpty()) {
+                break;
+            }
+
+            int action = chooseAction(qTable, currentState, applicableActions, epsilon);
+
+            lab.performAction(action);
+
+            int newState = lab.readCurrentState();
+
+            double calculatedReward = calculateReward(goalDescription);
+
+            double maxQNext = getMaxQ(qTable, newState, lab.getApplicableActions(newState));
+
+            // Update Q-value using the Q-learning formula
+            qTable[currentState][action] = qTable[currentState][action] +
+                    alpha * (calculatedReward + gamma * maxQNext - qTable[currentState][action]);
+
+            currentState = newState;
+
+            // Check if we've reached a goal state
+            if (isGoalState(newState, goalDescription)) {
+                break;
+            }
+        }
+
+        if (episode % 100 == 0) {
+            LOGGER.info("Completed episode " + episode + " of " + episodes);
+        }
+    }
+
+    // Save the Q-table for this goal description
+    qTables.put(goalKey, qTable);
+
+    printQTable(qTable);
+
+    LOGGER.info("Q-learning completed for goal " + Arrays.toString(goalDescription));
+}
+
+    /**
+     * Randomizes the state of the lab environment by performing random actions
+     */
+    private void randomizeState() {
+        Random random = new Random();
+        for (int i = 0; i < 5; i++) {
+            int currentState = lab.readCurrentState();
+            List<Integer> applicableActions = lab.getApplicableActions(currentState);
+            if (!applicableActions.isEmpty()) {
+                int randomActionIndex = random.nextInt(applicableActions.size());
+                int randomAction = applicableActions.get(randomActionIndex);
+                lab.performAction(randomAction);
+            }
+        }
+    }
+
+    /**
+     * Chooses an action using epsilon-greedy policy
+     * @param qTable The Q-table
+     * @param state The current state
+     * @param applicableActions List of applicable actions
+     * @param epsilon Exploration probability
+     * @return The chosen action
+     */
+    private int chooseAction(double[][] qTable, int state, List<Integer> applicableActions, double epsilon) {
+        Random random = new Random();
+
+        // With probability epsilon, choose a random action (exploration)
+        if (random.nextDouble() < epsilon) {
+            int randomIndex = random.nextInt(applicableActions.size());
+            return applicableActions.get(randomIndex);
+        }
+
+        // Otherwise, choose the action with the highest Q-value (exploitation)
+        return getBestAction(qTable, state, applicableActions);
+    }
+
+    /**
+     * Returns the action with the highest Q-value for the given state
+     * @param qTable The Q-table
+     * @param state The current state
+     * @param applicableActions List of applicable actions
+     * @return The action with the highest Q-value
+     */
+    private int getBestAction(double[][] qTable, int state, List<Integer> applicableActions) {
+        int bestAction = applicableActions.get(0); // Default to first applicable action
+        double bestValue = qTable[state][bestAction];
+
+        for (int action : applicableActions) {
+            if (qTable[state][action] > bestValue) {
+                bestValue = qTable[state][action];
+                bestAction = action;
+            }
+        }
+
+        return bestAction;
+    }
+
+    /**
+     * Returns the maximum Q-value for the next state
+     * @param qTable The Q-table
+     * @param state The state
+     * @param applicableActions List of applicable actions
+     * @return The maximum Q-value
+     */
+    private double getMaxQ(double[][] qTable, int state, List<Integer> applicableActions) {
+        if (applicableActions.isEmpty()) {
+            return 0.0; // No applicable actions
+        }
+
+        double maxValue = Double.NEGATIVE_INFINITY;
+        for (int action : applicableActions) {
+            maxValue = Math.max(maxValue, qTable[state][action]);
+        }
+
+        return maxValue;
+    }
+
+    /**
+     * Calculates the reward for transitioning to a new state
+     * @param goalDescription The goal description
+     * @return The calculated reward
+     */
+    private double calculateReward(Object[] goalDescription) {
+        // Extract the desired light levels from the goal description
+        int goalZ1Level = Integer.parseInt(goalDescription[0].toString());
+        int goalZ2Level = Integer.parseInt(goalDescription[1].toString());
+
+        lab.readCurrentState();
+        List<Integer> currentState = lab.currentState;
+
+        // Extract components from the current state
+        int z1Level = currentState.get(0);
+        int z2Level = currentState.get(1);
+        boolean z1Light = currentState.get(2) == 1;
+        boolean z2Light = currentState.get(3) == 1;
+        boolean z1Blinds = currentState.get(4) == 1;
+        boolean z2Blinds = currentState.get(5) == 1;
+        int sunshine = currentState.get(6);
+
+        int prevZ1Level = this.prevZ1Level;
+        int prevZ2Level = this.prevZ2Level;
+
+        // Update the previous state for the next iteration
+        this.prevZ1Level = z1Level;
+        this.prevZ2Level = z2Level;
+
+        // Check if we've reached the goal state
+        boolean atGoalState = (z1Level == goalZ1Level && z2Level == goalZ2Level);
+
+        double reward = -1.0; // Base step cost
+
+        // Add large reward if goal state is reached
+        if (atGoalState) {
+            reward += 100.0;
+        }
+
+        // Apply energy consumption penalty for lights (50 units each)
+        if (z1Light) {
+            reward -= 5.0; // Scaled from 50 units
+        }
+        if (z2Light) {
+            reward -= 5.0; // Scaled from 50 units
+        }
+
+        // Apply energy cost for blinds (1 unit each)
+        if (z1Blinds) {
+            reward -= 0.1; // Scaled from 1 unit
+        }
+        if (z2Blinds) {
+            reward -= 0.1; // Scaled from 1 unit
+        }
+
+        // Apply penalty for rapid changes in light levels
+        int z1LevelChange = Math.abs(z1Level - prevZ1Level);
+        int z2LevelChange = Math.abs(z2Level - prevZ2Level);
+        reward -= 0.1 * z1LevelChange + 0.1 * z2LevelChange;
+
+        // Add contextual intelligence for energy efficiency
+        // Penalize unnecessary light usage when natural light is available
+        if (sunshine >= 2) { // Medium or high sunshine
+            if (z1Blinds && z1Light) {
+                reward -= 1.0; // Additional penalty for using artificial light when natural light is available
+            }
+            if (z2Blinds && z2Light) {
+                reward -= 1.0;
+            }
+        }
+
+        return reward;
+    }
+
+
+    /**
+     * Checks if the current state is a goal state
+     * @param state The current state index
+     * @param goalDescription The goal description
+     * @return True if the state is a goal state, false otherwise
+     */
+    private boolean isGoalState(int state, Object[] goalDescription) {
+        // Extract the desired light levels from the goal description
+        int goalZ1Level = Integer.parseInt(goalDescription[0].toString());
+        int goalZ2Level = Integer.parseInt(goalDescription[1].toString());
+
+
+        List<Object> goalStateDesc = Arrays.asList(
+                goalZ1Level,
+                goalZ2Level,
+                null,
+                null,
+                null,
+                null,
+                null
+        );
+
+        // Get all states that match our goal description
+        List<Integer> goalStates = lab.getCompatibleStates(goalStateDesc);
+
+        // Check if our current state is one of the goal states
+        return goalStates.contains(state);
+    }
 
 /**
 * Returns information about the next best action based on a provided state and the QTable for
