@@ -29,7 +29,7 @@ This repository contains a partial implementation of a [JaCaMo](https://jacamo-l
 ```
 
 ## How to set up the simulator
-See instructions in [/simulator](/simulator).
+See instructions in [simulator](simulator).
 
 ## Task 2
 ### Task 2.1
