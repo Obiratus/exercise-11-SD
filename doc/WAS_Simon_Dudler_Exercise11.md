@@ -1,5 +1,5 @@
 # Exercise 11: Reinforcement Learning Agents
-The git repository can be found here: https://github.com/Obiratus/exercise-9-SD
+The git repository can be found here: https://github.com/Obiratus/exercise-11-SD
 
 ## Task 1: Learning the Q Way
 Reinforcement learning was used.
@@ -154,13 +154,6 @@ An advantage is, that the Q-learning algorithm itself doesn't need to change as 
 
 
 
-## Task 2: 
-
-
-
-## Task 3: 
-
-
 
 ## Declaration of aids
 
@@ -168,4 +161,6 @@ An advantage is, that the Q-learning algorithm itself doesn't need to change as 
 |--------|-----------------------|----------------------------------|
 | Task 1 | IntelliJ AI Assistant | Explain code.                    |
 | Task 1 | ChatGPT 4o            | Help formatting for markup file. |
+| Task 2 | IntelliJ AI Assistant | Explain code. Help with Syntax   |
+
 
