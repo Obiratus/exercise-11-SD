@@ -97,6 +97,20 @@ public abstract class LearningEnvironment {
   public abstract int readCurrentState();
 
   /**
+   * Returns the current state of the environment.
+   * <p>
+   * The current state of the lab (and of every state of the lab) is formed as a
+   * a list of 7 integer values: [z1Level, z2Level, z1Light, z2Light, z1Blinds, z2Blinds, sunshine]
+   * space.
+   * </p>
+   *
+   * @return the current state
+   */
+  public abstract List<Integer> getCurrentState();
+
+
+
+  /**
    * Returns the actions that are applicable in a given state.
    * <p>
    * Each action is represented as an integer value that corresponds to the

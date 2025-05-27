@@ -5,6 +5,10 @@ import java.util.logging.*;
 import cartago.Artifact;
 import cartago.OPERATION;
 import cartago.OpFeedbackParam;
+import java.io.FileWriter;
+import java.io.IOException;
+
+
 
 public class QLearner extends Artifact {
     private int prevZ1Level = 0; // Default to 0 or another appropriate initial value
@@ -116,22 +120,49 @@ public void calculateQ(Object[] goalDescription, Object episodesObj, Object alph
 
             if (matchesGoal) {
                 LOGGER.info("Goal state reached in episode " + episode + " after " + step + " steps.");
-                LOGGER.info("Goal state found at currentState " + currentState + ".");
+                LOGGER.info("Goal state found at state " + currentState + ".");
                 break;
             }
+
+
 
         }
 
         if (episodes <= 10 || episode % 100 == 0) {
             LOGGER.info("Completed episode " + episode + " of " + episodes);
         }
+    try {
+        // Wait for 2 seconds
+        Thread.sleep(10000);
+    } catch (InterruptedException e) {
+        e.printStackTrace();
+    }
     }
 
     // Save the Q-table for this goal description
     qTables.put(goalKey, qTable);
 
-    printQTable(qTable);
+    // Save Q-table to CSV
 
+    String filePath = "qtable_" + goalKey + ".csv"; // Use goalKey to create a unique filename
+    try (FileWriter fileWriter = new FileWriter(filePath)) {
+        for (double[] stateRow : qTable) {
+            for (int j = 0; j < stateRow.length; j++) {
+                fileWriter.write(stateRow[j] + (j == stateRow.length - 1 ? "" : ",")); // Comma-separated
+            }
+            fileWriter.write("\n"); // Newline for new state
+        }
+        LOGGER.info("Q-table for goal " + goalKey + " saved to file: " + filePath);
+    } catch (IOException e) {
+        LOGGER.severe("Failed to save Q-table to file: " + e.getMessage());
+    }
+    /**
+    **/
+
+
+
+    printQTable(qTable);
+    randomizeState(goalDescription);
     LOGGER.info("Q-learning completed for goal " + Arrays.toString(goalDescription));
 }
 
@@ -405,35 +436,122 @@ public void calculateQ(Object[] goalDescription, Object episodesObj, Object alph
         return goalStates.contains(state);
     }
 
-/**
-* Returns information about the next best action based on a provided state and the QTable for
-* a goal description. The returned information can be used by agents to invoke an action 
-* using a ThingArtifact.
-*
-* @param  goalDescription  the desired goal against the which the Q matrix is calculated (e.g., [2,3])
-* @param  currentStateDescription the current state e.g. [2,2,true,false,true,true,2]
-* @param  nextBestActionTag the (returned) semantic annotation of the next best action, e.g. "http://example.org/was#SetZ1Light"
-* @param  nextBestActionPayloadTags the (returned) semantic annotations of the payload of the next best action, e.g. [Z1Light]
-* @param nextBestActionPayload the (returned) payload of the next best action, e.g. true
-**/
-  @OPERATION
-  public void getActionFromState(Object[] goalDescription, Object[] currentStateDescription,
-      OpFeedbackParam<String> nextBestActionTag, OpFeedbackParam<Object[]> nextBestActionPayloadTags,
-      OpFeedbackParam<Object[]> nextBestActionPayload) {
-         
-        // remove the following upon implementing Task 2.3!
+    /**
+     * Returns information about the next best action based on a provided state and the QTable for
+     * a goal description. The returned information can be used by agents to invoke an action
+     * using a ThingArtifact.
+     *
+     * @param  goalDescription  the desired goal against the which the Q matrix is calculated (e.g., [2,3])
+     * @param  currentStateDescription the current state e.g. [2,2,true,false,true,true,2]
+     * @param  nextBestActionTag the (returned) semantic annotation of the next best action, e.g. "http://example.org/was#SetZ1Light"
+     * @param  nextBestActionPayloadTags the (returned) semantic annotations of the payload of the next best action, e.g. [Z1Light]
+     * @param nextBestActionPayload the (returned) payload of the next best action, e.g. true
+     **/
+    @OPERATION
+    public void getActionFromState(Object[] goalDescription, Object[] currentStateDescription,
+                                   OpFeedbackParam<String> nextBestActionTag, OpFeedbackParam<Object[]> nextBestActionPayloadTags,
+                                   OpFeedbackParam<Object[]> nextBestActionPayload) {
+        /**
+        // Log the raw input goalDescription
+        LOGGER.info("Received goal description: " + Arrays.toString(goalDescription));
 
-        // sets the semantic annotation of the next best action to be returned 
-        nextBestActionTag.set("http://example.org/was#SetZ1Light");
+        // Convert to a proper List<Object> with explicit Integer conversion
+        List<Object> goalDescList = new ArrayList<>();
+        for (Object b : goalDescription) {
+            if (b instanceof Byte) {
+                goalDescList.add(((Byte) b).intValue()); // Safely cast Byte to Integer
+            } else {
+                throw new IllegalArgumentException("Unexpected type in goalDescription: " + b.getClass());
+            }
+        }
 
-        // sets the semantic annotation of the payload of the next best action to be returned 
-        Object payloadTags[] = { "Z1Light" };
-        nextBestActionPayloadTags.set(payloadTags);
+        // Attempt to get the state indices that match the goal description
+        List<Integer> goalStateIndices = lab.getCompatibleStates(goalDescList);
+        LOGGER.info("Result from lab.getCompatibleStates using goal description: " + goalStateIndices);
 
-        // sets the payload of the next best action to be returned 
-        Object payload[] = { true };
-        nextBestActionPayload.set(payload);
-      }
+
+        // Ensure the goal state exists in the lab's state space
+        if (goalStateIndices.isEmpty()) {
+            LOGGER.severe("No states found that match the goal description: " + Arrays.toString(goalDescription));
+            LOGGER.severe("Possible explanations: "
+                    + "1) The state space does not contain this goal description. "
+                    + "2) The goal description format doesn't match the expected format for compatible states."
+            );
+            return;
+        }
+        */
+
+
+        // Convert the current state to a list for compatibility with specific conversions
+        List<Object> currentStateDescList = new ArrayList<>();
+        for (int i = 0; i < currentStateDescription.length; i++) {
+            Object element = currentStateDescription[i];
+            if (element instanceof Byte) {
+                Byte byteValue = (Byte) element;
+                if (i >= 2 && i <= 5) {
+                    // Indices 2, 3, 4, 5: Convert 0 to false, 1 to true
+                    if (byteValue == 0) {
+                        currentStateDescList.add(false); // Map 0 -> false
+                    } else if (byteValue == 1) {
+                        currentStateDescList.add(true); // Map 1 -> true
+                    } else {
+                        throw new IllegalArgumentException(
+                                "Unexpected value at index " + i + ": " + byteValue + ". Expected 0 or 1.");
+                    }
+                } else {
+                    // Indices 0, 1, 6: Convert Byte to Integer
+                    currentStateDescList.add(byteValue.intValue());
+                }
+            } else {
+                // Add non-Byte elements as is (if applicable, though not expected here)
+                currentStateDescList.add(element);
+            }
+        }
+
+        // Log the converted state description
+        LOGGER.info("Converted current state description: " + currentStateDescList);
+
+
+        List<Integer> currentStateIndices = lab.getCompatibleStates(currentStateDescList);
+
+        // Ensure the current state exists in the lab's state space
+        if (currentStateIndices.isEmpty()) {
+            LOGGER.warning("No states found that match the current state description: " +
+                    Arrays.toString(currentStateDescription));
+            nextBestActionTag.set("http://example.org/was#NoOp");
+            nextBestActionPayloadTags.set(new Object[]{});
+            nextBestActionPayload.set(new Object[]{});
+            return;
+        }
+
+
+        // Get the first current state index
+        int currentStateIndex = currentStateIndices.get(0);
+        LOGGER.info("Current state index: " + currentStateIndex);
+        List<Integer> applicableActions = lab.getApplicableActions(currentStateIndex);
+
+        Integer goalKey = Arrays.hashCode(goalDescription);
+        LOGGER.info("Generated goalKey: " + goalKey);
+
+        // Retrieve the Q-Table for the given goal key
+        double[][] qTable = qTables.get(goalKey);
+
+        // Get the best action for a given state
+        int bestActionId = getBestAction(qTable, currentStateIndex, applicableActions);
+
+
+        // Fetch the action details from the lab
+        Action bestAction = lab.getAction(bestActionId);
+        nextBestActionTag.set(bestAction.getActionTag());
+        nextBestActionPayloadTags.set(bestAction.getPayloadTags());
+        nextBestActionPayload.set(bestAction.getPayload());
+
+        LOGGER.info("Returning best action: " + bestAction.getActionTag() +
+                ", Payload Tags: " + Arrays.toString(bestAction.getPayloadTags()) +
+                ", Payload: " + Arrays.toString(bestAction.getPayload()));
+    }
+
+
 
     /**
     * Print the Q matrix

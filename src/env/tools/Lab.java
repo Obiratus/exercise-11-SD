@@ -3,6 +3,7 @@ package tools;
 import java.io.IOException;
 import java.util.*;
 import java.util.logging.*;
+
 import com.google.common.collect.Sets;
 import ch.unisg.ics.interactions.wot.td.ThingDescription;
 import ch.unisg.ics.interactions.wot.td.ThingDescription.TDFormat;
@@ -17,6 +18,7 @@ import ch.unisg.ics.interactions.wot.td.schemas.BooleanSchema;
 import ch.unisg.ics.interactions.wot.td.schemas.ObjectSchema;
 import ch.unisg.ics.interactions.wot.td.vocabularies.TD;
 
+
 /**
 * An class that extends {@link LearningEnvironment} for representing a learning
 * environment which can be used for Q learning.
@@ -28,6 +30,8 @@ import ch.unisg.ics.interactions.wot.td.vocabularies.TD;
 * </p>
 */
 public class Lab extends LearningEnvironment {
+
+
 
   /**
   * The W3C Web of Things Thing Description used for interacting with the
@@ -180,6 +184,11 @@ public class Lab extends LearningEnvironment {
       List<Integer> compatibleStates = new ArrayList<>();
       List<List<Integer>> stateList = new ArrayList<>(stateSpace);
 
+      LOGGER.info("Starting getCompatibleStates...");
+      LOGGER.info("Received state description: " + stateDescription);
+      //LOGGER.info("State space size: " + stateList.size());
+
+
       for (int i=0; i<stateList.size(); i++) {
         List<Integer> state = stateList.get(i);
 
@@ -193,15 +202,43 @@ public class Lab extends LearningEnvironment {
         substates.add(Lab.z2Blinds.get(state.get(5)));
         substates.add(Lab.sunshine.get(state.get(6)));
 
+        // Debugging: Log individual state and substates
+        // LOGGER.info("Checking state " + i + ": " + state);
+        // LOGGER.info("Constructed substates: " + substates);
+
+
+        // logList("Substates", substates);
+        // logList("State Description", stateDescription);
+
         if (Collections.indexOfSubList(substates, stateDescription) != -1){
           compatibleStates.add(i);
-          System.out.println(state);
+          // System.out.println(state);
+          // Log the compatible state that matched
+          // LOGGER.info("Compatible state found (index " + i + "): " + substates);
+
+
+        } else {
+          // Log why no match occurred
+         // LOGGER.info("No match for state " + i + ". Substates: " + substates + ", Description: " + stateDescription);
+
         };
+
       }
       return compatibleStates;
     }
 
-    /**
+
+  private void logList(String listName, List<Object> list) {
+    LOGGER.info(listName + ": " + list);
+    for (int i = 0; i < list.size(); i++) {
+      Object val = list.get(i);
+      String type = (val == null) ? "null" : val.getClass().getName();
+      LOGGER.info(listName + "[" + i + "] = (" + type + ") " + val);
+    }
+  }
+
+
+  /**
     * @see {@link LearningEnvironment#readCurrentState()}
     */
     @Override
@@ -249,6 +286,16 @@ public class Lab extends LearningEnvironment {
       List<List<Integer>> stateList = new ArrayList<>(stateSpace);
       return stateList.indexOf(this.currentState);
     }
+
+  /**
+   * @see {@link LearningEnvironment#getCurrentState()}
+   */
+  @Override
+  public List<Integer> getCurrentState() {
+    readCurrentState();
+    return this.currentState;
+
+  }
 
     /**
     * @see {@link LearningEnvironment#getApplicableActions(int)}
