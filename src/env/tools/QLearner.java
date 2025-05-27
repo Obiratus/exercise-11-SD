@@ -132,7 +132,7 @@ public void calculateQ(Object[] goalDescription, Object episodesObj, Object alph
             LOGGER.info("Completed episode " + episode + " of " + episodes);
         }
     try {
-        // Wait for 2 seconds
+        // Wait for 10 seconds
         Thread.sleep(10000);
     } catch (InterruptedException e) {
         e.printStackTrace();
@@ -144,6 +144,7 @@ public void calculateQ(Object[] goalDescription, Object episodesObj, Object alph
 
     // Save Q-table to CSV
 
+    /**
     String filePath = "qtable_" + goalKey + ".csv"; // Use goalKey to create a unique filename
     try (FileWriter fileWriter = new FileWriter(filePath)) {
         for (double[] stateRow : qTable) {
@@ -156,7 +157,7 @@ public void calculateQ(Object[] goalDescription, Object episodesObj, Object alph
     } catch (IOException e) {
         LOGGER.severe("Failed to save Q-table to file: " + e.getMessage());
     }
-    /**
+
     **/
 
 
@@ -518,9 +519,6 @@ public void calculateQ(Object[] goalDescription, Object episodesObj, Object alph
         if (currentStateIndices.isEmpty()) {
             LOGGER.warning("No states found that match the current state description: " +
                     Arrays.toString(currentStateDescription));
-            nextBestActionTag.set("http://example.org/was#NoOp");
-            nextBestActionPayloadTags.set(new Object[]{});
-            nextBestActionPayload.set(new Object[]{});
             return;
         }
 

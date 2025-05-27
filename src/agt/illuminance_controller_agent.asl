@@ -3,7 +3,7 @@
 /*
 * The URL of the W3C Web of Things Thing Description (WoT TD) of a lab environment
 * Simulated lab WoT TD: "https://raw.githubusercontent.com/Interactions-HSG/example-tds/was/tds/interactions-lab.ttl"
-* Real lab WoT TD: Get in touch with us by email to acquire access to it!
+* Real lab WoT TD: "https://raw.githubusercontent.com/Interactions-HSG/example-tds/was/tds/interactions-lab-real.ttl"
 */
 
 /* Initial beliefs and rules */
@@ -11,6 +11,8 @@
 // the agent has a belief about the location of the W3C Web of Thing (WoT) Thing Description (TD)
 // that describes a lab environment to be learnt
 learning_lab_environment("https://raw.githubusercontent.com/Interactions-HSG/example-tds/was/tds/interactions-lab.ttl").
+real_lab_environment("https://raw.githubusercontent.com/Interactions-HSG/example-tds/was/tds/interactions-lab-real.ttl").
+
 
 // the agent believes that the task that takes place in the 1st workstation requires an indoor illuminance
 // level of Rank 2, and the task that takes place in the 2nd workstation requires an indoor illumincance
@@ -30,13 +32,13 @@ reward(100).       // reward for reaching goal state
 /*
  * Plan for reacting to the addition of the goal !start
  * Triggering event: addition of goal !start
- * Context: the agent believes that there is a WoT TD of a lab environment located at Url, and that
- * the tasks taking place in the workstations require indoor illuminance levels of Rank Z1Level and Z2Level
- * respectively
- * Body: creates a QLearnerArtifact for learning and a ThingArtifact for acting on the lab environment.
+ * Context: the agent believes that there is a WoT TD of a simulated lab environment (Url),
+ * and that the tasks taking place in the workstations require indoor illuminance levels of Rank Z1Level and Z2Level.
+ * Body: creates artifacts for learning from the simulated environment.
 */
 @start
-+!start : learning_lab_environment(Url)
++!start : learning_lab_environment(SimUrl)
+  & real_lab_environment(RealUrl)
   & task_requirements([Z1Level, Z2Level])
   & episodes(E)
   & alpha(A)
@@ -47,78 +49,57 @@ reward(100).       // reward for reaching goal state
   .print("Hello world");
   .print("I want to achieve Z1Level=", Z1Level, " and Z2Level=",Z2Level);
 
-  // creates a QLearner artifact for learning the lab Thing described by the W3C WoT TD located at URL
-  .print("Creating QLearner artifact...");
-  makeArtifact("qlearner", "tools.QLearner", [Url], QLArtId);
+  // Create QLearner artifact using the simulated lab environment TD (SimUrl)
+  .print("Creating QLearner artifact for the simulated lab...");
+  makeArtifact("qlearner", "tools.QLearner", [SimUrl], QLArtId);
   .print("QLearner artifact created with ID: ", QLArtId);
   focus(QLArtId);
-
-  // creates a EnvironmentHelper artifact
-  .print("Creating EnvironmentHelper artifact...");
-  makeArtifact("Lab", "tools.EnvironmentHelper", [Url], HelperArtId);
-  .print("Lab artifact created with ID: ", HelperArtId);
-  focus(HelperArtId);
 
 
   // creates a ThingArtifact artifact for reading and acting on the lab Thing
   .print("Creating ThingArtifact...");
-  makeArtifact("lab", "org.hyperagents.jacamo.artifacts.wot.ThingArtifact", [Url], LabThingArtId);
+  makeArtifact("simLab", "org.hyperagents.jacamo.artifacts.wot.ThingArtifact", [RealUrl], LabThingArtId);
   .print("ThingArtifact created with ID: ", LabThingArtId);
   focus(LabThingArtId);
 
 
   // Use the calculateQ operation to learn Q tables for the desired environment state
-  .print("Starting Q-learning with ", E, " episodes...");
+  .print("Starting Q-learning in simulated lab with ", E, " episodes...");
   calculateQ([Z1Level, Z2Level], E, A, G, Eps, R);
   .print("Q-learning completed for goal [", Z1Level, ",", Z2Level, "]");
 
-  // After learning, try to achieve the goal
+  // Once the learning is complete, transition to the real lab for goal achievement
+  .print("Transitioning to the real lab environment to act on learned strategies...");
   !achieve_goal([Z1Level, Z2Level]).
 
 /*
- * Plan for achieving the goal state
- * Context: the agent has a goal state to achieve
+ * Plan for achieving the goal state in the real lab environment
  */
-+!achieve_goal(GoalState) <-
-  .print("Trying to achieve goal state: ", GoalState);
++!achieve_goal(GoalState) : real_lab_environment(RealUrl) <-
+  // Clear start message
+  .print("Achieving goal state in the real lab environment: ", GoalState);
+
+  // Create and focus the ThingArtifact for interacting with the real lab
+  .print("Setting up ThingArtifact for the real lab...");
+  makeArtifact("realLab", "org.hyperagents.jacamo.artifacts.wot.ThingArtifact", [RealUrl], RealLabArtId);
+  .print("ThingArtifact for the real lab created with ID: ", RealLabArtId);
+  focus(RealLabArtId);
+
+    // Create EnvironmentHelper artifact to assist interaction with the real lab environment
+  .print("Creating EnvironmentHelper for the simulated lab...");
+  makeArtifact("LabHelper", "tools.EnvironmentHelper", [RealUrl], HelperArtId);
+  .print("EnvironmentHelper artifact created with ID: ", HelperArtId);
+  focus(HelperArtId);
+
+  // Begin monitoring and acting process to achieve the goal
   !monitor_and_act(GoalState).
-
-
-+!find_value(Tags, Values, PropertyName, ResultValue) <-
-    // Construct the full URI for the property
-    .concat("http://example.org/was#", PropertyName, FullURI);
-
-    .length(Tags, TagsLength);
-    +find_value_index(0);
-    -found_value;
-
-    while (find_value_index(I) & I < TagsLength & not found_value) {
-        .nth(I, Tags, CurrentTag);
-        if (CurrentTag = FullURI) {
-            .nth(I, Values, TempValue);
-            +found_value(TempValue);
-            +found_value;
-        } else {
-            -+find_value_index(I+1);
-        }
-    }
-
-    // Clean up
-    -find_value_index(_);
-    if (found_value) {
-        ?found_value(ResultValue);
-        -found_value(ResultValue);
-    } else {
-        ResultValue = "not-found";
-    }
-    -found_value.
 
 /*
  * Plan for monitoring the environment and taking actions
  * Context: the agent is trying to achieve a goal state
  */
 +!monitor_and_act(GoalState) <-
-  .print("Starting to monitor environment and take actions");
+  .print("Monitoring the real lab environment to achieve the goal state...");
 
   // Read the Status property which contains Z1Level and Z2Level
   // .print("Reading Status property via TD...");
@@ -129,7 +110,7 @@ reward(100).       // reward for reaching goal state
   // Read the current state directly from the Lab artifact
   .print("Reading Status property via EnvironmentHelper...");
   getCurrentState(CurrentState);
-  .print("Current state from EnvironmentHelper artifact: ", CurrentState);
+  .print("Current state: ", CurrentState);
 
   // Extract individual values from CurrentState
   .nth(0, CurrentState, Z1L);
@@ -164,18 +145,10 @@ reward(100).       // reward for reaching goal state
     // Execute the action
     .print("Executing action using invokeAction...");
     invokeAction(ActionTag, PayloadTags, Payload);
-    .print("Action executed successfully");
+    .print("Action executed. Waiting before monitoring again...");
+    .wait(30000); // Wait for changes to take effect
 
-    // Wait a bit before checking the state again
-    .print("Waiting for the environment to respond...");
-    .wait(1000);
-    .print("Wait completed, checking state again");
-
-    // Pause for 2 seconds before the next monitoring cycle
-    .print("Pausing for 2 seconds...");
-    .wait(2000);
-
-    // Recursively monitor and act until goal is achieved
+    // Recursively call the monitor-and-act plan until the goal is achieved
     !monitor_and_act(GoalState);
   }.
 
